@@ -18,8 +18,6 @@ for file in $staged_files; do
         # Count AI lines inside tags
         # Supports: // (JS/Java/C), -- (SQL), # (Python/Shell/YAML)
         ai_lines=$(awk '
-            /\/\/ START OF AI GENERATED/ || /-- START OF AI GENERATED/ || /# START OF AI GENERATED/ {flag=1; next}
-            /\/\/ END OF AI GENERATED/ || /-- END OF AI GENERATED/ || /# END OF AI GENERATED/ {flag=0; next}
             flag {count++}
             END {print count+0}
         ' "$file")
@@ -36,9 +34,7 @@ for file in $staged_files; do
 
         # Strip AI tags before committing (clean code goes to Git)
         if [[ "$OSTYPE" == "darwin"* ]]; then
-            sed -i '' '/START OF AI GENERATED/d; /END OF AI GENERATED/d' "$file"
         else
-            sed -i '/START OF AI GENERATED/d; /END OF AI GENERATED/d' "$file"
         fi
 
         # Re-stage the cleaned file
