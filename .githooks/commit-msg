@@ -1,0 +1,27 @@
+#!/bin/bash
+
+COMMIT_MSG_FILE=$1
+TEMP_COUNT_FILE=".git/ai_lines_count.tmp"
+TEMP_MANUAL_FILE=".git/manual_lines_count.tmp"
+
+ai_count=0
+manual_count=0
+
+# Read AI lines count
+if [ -f "$TEMP_COUNT_FILE" ]; then
+    ai_count=$(cat "$TEMP_COUNT_FILE")
+    rm -f "$TEMP_COUNT_FILE"
+fi
+
+# Read Manual lines count
+if [ -f "$TEMP_MANUAL_FILE" ]; then
+    manual_count=$(cat "$TEMP_MANUAL_FILE")
+    rm -f "$TEMP_MANUAL_FILE"
+fi
+
+# Append metrics to commit message
+echo "" >> "$COMMIT_MSG_FILE"
+echo "AI-Lines-Of-Code: $ai_count" >> "$COMMIT_MSG_FILE"
+echo "Manual-LOC: $manual_count" >> "$COMMIT_MSG_FILE"
+
+exit 0

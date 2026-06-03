@@ -1,0 +1,65 @@
+name: Preserve AI LOC on Squash Merge
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  preserve-metrics:
+    if: ${{ github.event.pull_request.merged == true }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Detect squash merge
+        id: detect_squash
+        run: |
+          if git show -s --format='%s' ${{ github.event.pull_request.merge_commit_sha }} | grep -q 'Squashed commit of the following'; then
+            echo "is_squash=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_squash=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Sum metrics from all PR commits
+        if: steps.detect_squash.outputs.is_squash == 'true'
+        id: metrics
+        run: |
+          total_ai=0
+          total_manual=0
+
+          git fetch origin "pull/${{ github.event.pull_request.number }}/head:pr_head"
+
+          git log origin/${{ github.event.pull_request.base.ref }}..pr_head --format="%B" | while IFS= read -r line; do
+            if [[ "$line" =~ AI-Lines-Of-Code:\ ([0-9]+) ]]; then
+              total_ai=$((total_ai + ${BASH_REMATCH[1]}))
+            fi
+            if [[ "$line" =~ Manual-LOC:\ ([0-9]+) ]]; then
+              total_manual=$((total_manual + ${BASH_REMATCH[1]}))
+            fi
+          done
+
+          echo "total_ai=$total_ai" >> $GITHUB_OUTPUT
+          echo "total_manual=$total_manual" >> $GITHUB_OUTPUT
+          echo "Total AI: $total_ai, Manual: $total_manual"
+
+      - name: Amend squash commit message with metrics
+        if: steps.detect_squash.outputs.is_squash == 'true'
+        run: |
+          git config user.email "github-actions@github.com"
+          git config user.name "GitHub Actions"
+
+          git checkout ${{ github.event.pull_request.base.ref }}
+          git pull origin ${{ github.event.pull_request.base.ref }}
+
+          CURRENT_MSG=$(git log -1 --format="%B")
+
+          git commit --amend -m "$CURRENT_MSG
+
+AI-Lines-Of-Code: ${{ steps.metrics.outputs.total_ai }}
+Manual-LOC: ${{ steps.metrics.outputs.total_manual }}"
+
+          git push --force-with-lease origin ${{ github.event.pull_request.base.ref }}
