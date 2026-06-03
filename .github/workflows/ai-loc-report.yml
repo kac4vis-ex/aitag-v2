@@ -1,0 +1,85 @@
+# START OF AI GENERATED
+name: AI LOC Report
+
+on:
+  workflow_dispatch:
+    inputs:
+      from_date:
+        description: "From date (YYYY-MM-DD)"
+        required: true
+      to_date:
+        description: "To date (YYYY-MM-DD)"
+        required: true
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Generate AI LOC Report
+        run: |
+          echo "## 🤖 AI LOC Report" >> $GITHUB_STEP_SUMMARY
+          echo "**From:** ${{ github.event.inputs.from_date }} **To:** ${{ github.event.inputs.to_date }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          total_ai=0
+          total_manual=0
+
+          # Temp file for per-developer tracking
+          > /tmp/dev_metrics.txt
+
+          # Loop through commits in date range
+          while IFS='|' read -r sha author date message; do
+            ai=0
+            manual=0
+
+            while IFS= read -r line; do
+              if [[ "$line" =~ AI-Lines-Of-Code:\ ([0-9]+) ]]; then
+                ai=$((ai + ${BASH_REMATCH[1]}))
+              fi
+              if [[ "$line" =~ Manual-LOC:\ ([0-9]+) ]]; then
+                manual=$((manual + ${BASH_REMATCH[1]}))
+              fi
+            done <<< "$message"
+
+            if [ "$ai" -gt 0 ] || [ "$manual" -gt 0 ]; then
+              total_ai=$((total_ai + ai))
+              total_manual=$((total_manual + manual))
+
+              # store per developer
+              echo "$author|$ai|$manual" >> /tmp/dev_metrics.txt
+            fi
+
+          done < <(git log \
+            --after="${{ github.event.inputs.from_date }}" \
+            --before="${{ github.event.inputs.to_date }}" \
+            --format="%H|%aN|%ad|%B|---COMMIT_END---" \
+            --date=short)
+
+          # Overall summary
+          echo "### 📊 Overall Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Type | Lines |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🤖 AI-Assisted LOC | $total_ai |" >> $GITHUB_STEP_SUMMARY
+          echo "| ✍️ Manual LOC | $total_manual |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Per developer summary
+          echo "### 👨‍💻 Per Developer" >> $GITHUB_STEP_SUMMARY
+          echo "| Developer | AI LOC | Manual LOC |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|------------|" >> $GITHUB_STEP_SUMMARY
+
+          # Aggregate per developer
+          sort /tmp/dev_metrics.txt | awk -F'|' '
+          {
+            dev[$1]["ai"]   += $2
+            dev[$1]["manual"] += $3
+          }
+          END {
+            for (d in dev)
+              print "| " d " | " dev[d]["ai"] " | " dev[d]["manual"] " |"
+          }' >> $GITHUB_STEP_SUMMARY
+# END OF AI GENERATED
