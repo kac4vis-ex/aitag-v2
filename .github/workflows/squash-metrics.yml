@@ -33,14 +33,14 @@ jobs:
 
           git fetch origin "pull/${{ github.event.pull_request.number }}/head:pr_head"
 
-          git log origin/${{ github.event.pull_request.base.ref }}..pr_head --format="%B" | while IFS= read -r line; do
+          while IFS= read -r line; do
             if [[ "$line" =~ AI-Lines-Of-Code:\ ([0-9]+) ]]; then
               total_ai=$((total_ai + ${BASH_REMATCH[1]}))
             fi
             if [[ "$line" =~ Manual-LOC:\ ([0-9]+) ]]; then
               total_manual=$((total_manual + ${BASH_REMATCH[1]}))
             fi
-          done
+          done < <(git log origin/${{ github.event.pull_request.base.ref }}..pr_head --format="%B")
 
           echo "total_ai=$total_ai" >> $GITHUB_OUTPUT
           echo "total_manual=$total_manual" >> $GITHUB_OUTPUT
@@ -56,10 +56,13 @@ jobs:
           git pull origin ${{ github.event.pull_request.base.ref }}
 
           CURRENT_MSG=$(git log -1 --format="%B")
+          TOTAL_AI="${{ steps.metrics.outputs.total_ai }}"
+          TOTAL_MANUAL="${{ steps.metrics.outputs.total_manual }}"
 
-          git commit --amend -m "$CURRENT_MSG
+          NEW_MSG="${CURRENT_MSG}
 
-AI-Lines-Of-Code: ${{ steps.metrics.outputs.total_ai }}
-Manual-LOC: ${{ steps.metrics.outputs.total_manual }}"
+AI-Lines-Of-Code: ${TOTAL_AI}
+Manual-LOC: ${TOTAL_MANUAL}"
 
+          git commit --amend -m "${NEW_MSG}"
           git push --force-with-lease origin ${{ github.event.pull_request.base.ref }}
