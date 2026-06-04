@@ -59,10 +59,7 @@ jobs:
           TOTAL_AI="${{ steps.metrics.outputs.total_ai }}"
           TOTAL_MANUAL="${{ steps.metrics.outputs.total_manual }}"
 
-          NEW_MSG="${CURRENT_MSG}
-
-AI-Lines-Of-Code: ${TOTAL_AI}
-Manual-LOC: ${TOTAL_MANUAL}"
+          NEW_MSG=$(printf "%s\n\nAI-Lines-Of-Code: %s\nManual-LOC: %s" "$CURRENT_MSG" "$TOTAL_AI" "$TOTAL_MANUAL")
 
           git commit --amend -m "${NEW_MSG}"
           git push --force-with-lease origin ${{ github.event.pull_request.base.ref }}
