@@ -11,17 +11,26 @@ total_manual_lines=0
 staged_files=$(git diff --cached --name-only)
 
 for file in $staged_files; do
+    # skip hooks folder!
+    if [[ "$file" == .githooks/* ]]; then
+        continue
+    fi
+
     if [ -f "$file" ]; then
 
+        ai_lines=$(awk '/START OF AI GENERATED/{flag=1;next}/END OF AI GENERATED/{flag=0;next}flag{count++}END{print count+0}' "$file")
 
         total_ai_lines=$((total_ai_lines + ai_lines))
 
         file_added_lines=$(git diff --cached -- "$file" | grep "^+" | grep -v "^+++" | wc -l | tr -d ' ')
 
-        manual_lines=$((file_added_lines - ai_lines))
+        tag_lines=$(git diff --cached -- "$file" | grep "^+" | grep -v "^+++" | grep -E "START OF AI GENERATED|END OF AI GENERATED" | wc -l | tr -d ' ')
+
+        manual_lines=$((file_added_lines - ai_lines - tag_lines))
         if [ "$manual_lines" -lt 0 ]; then manual_lines=0; fi
         total_manual_lines=$((total_manual_lines + manual_lines))
 
+        sed -i "/START OF AI GENERATED/d; /END OF AI GENERATED/d" "$file"
 
         git add "$file"
     fi
