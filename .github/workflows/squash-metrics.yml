@@ -15,12 +15,17 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
+      - name: Fetch PR head
+        run: |
+          git fetch origin "pull/${{ github.event.pull_request.number }}/head:pr_head"
+          git fetch origin ${{ github.event.pull_request.base.ref }}
+
       - name: Detect squash merge
         id: detect_squash
         run: |
-          git fetch origin "pull/${{ github.event.pull_request.number }}/head:pr_head"
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
 
-          PR_COMMIT_COUNT=$(git rev-list ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} --count)
+          PR_COMMIT_COUNT=$(git rev-list ${BASE_SHA}..pr_head --count)
           MAIN_NEW_COUNT=$(git rev-list origin/${{ github.event.pull_request.base.ref }}..HEAD --count)
 
           echo "PR commits: $PR_COMMIT_COUNT"
@@ -40,7 +45,6 @@ jobs:
           total_manual=0
 
           BASE_SHA="${{ github.event.pull_request.base.sha }}"
-          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
 
           while IFS= read -r line; do
             if [[ "$line" =~ AI-Lines-Of-Code:\ ([0-9]+) ]]; then
@@ -49,7 +53,7 @@ jobs:
             if [[ "$line" =~ Manual-LOC:\ ([0-9]+) ]]; then
               total_manual=$((total_manual + ${BASH_REMATCH[1]}))
             fi
-          done < <(git log ${BASE_SHA}..${HEAD_SHA} --format="%B")
+          done < <(git log ${BASE_SHA}..pr_head --format="%B")
 
           echo "total_ai=$total_ai" >> $GITHUB_OUTPUT
           echo "total_manual=$total_manual" >> $GITHUB_OUTPUT
@@ -64,7 +68,8 @@ jobs:
           git checkout ${{ github.event.pull_request.base.ref }}
           git pull origin ${{ github.event.pull_request.base.ref }}
 
-          CURRENT_MSG=$(git log -1 --format="%B")
+          # get only PR title (first line) — no individual commit messages!
+          CURRENT_MSG=$(git log -1 --format="%s")
           TOTAL_AI="${{ steps.metrics.outputs.total_ai }}"
           TOTAL_MANUAL="${{ steps.metrics.outputs.total_manual }}"
 
