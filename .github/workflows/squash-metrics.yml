@@ -18,7 +18,15 @@ jobs:
       - name: Detect squash merge
         id: detect_squash
         run: |
-          if git show -s --format='%s' ${{ github.event.pull_request.merge_commit_sha }} | grep -q 'Squashed commit of the following'; then
+          git fetch origin "pull/${{ github.event.pull_request.number }}/head:pr_head"
+
+          PR_COMMIT_COUNT=$(git rev-list origin/${{ github.event.pull_request.base.ref }}..pr_head --count)
+          MAIN_NEW_COUNT=$(git rev-list origin/${{ github.event.pull_request.base.ref }}..HEAD --count)
+
+          echo "PR commits: $PR_COMMIT_COUNT"
+          echo "Main new commits: $MAIN_NEW_COUNT"
+
+          if [ "$PR_COMMIT_COUNT" -gt 1 ] && [ "$MAIN_NEW_COUNT" -eq 1 ]; then
             echo "is_squash=true" >> $GITHUB_OUTPUT
           else
             echo "is_squash=false" >> $GITHUB_OUTPUT
@@ -30,8 +38,6 @@ jobs:
         run: |
           total_ai=0
           total_manual=0
-
-          git fetch origin "pull/${{ github.event.pull_request.number }}/head:pr_head"
 
           while IFS= read -r line; do
             if [[ "$line" =~ AI-Lines-Of-Code:\ ([0-9]+) ]]; then
