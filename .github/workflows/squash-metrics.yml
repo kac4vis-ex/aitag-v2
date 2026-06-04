@@ -20,7 +20,7 @@ jobs:
         run: |
           git fetch origin "pull/${{ github.event.pull_request.number }}/head:pr_head"
 
-          PR_COMMIT_COUNT=$(git rev-list origin/${{ github.event.pull_request.base.ref }}..pr_head --count)
+          PR_COMMIT_COUNT=$(git rev-list ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} --count)
           MAIN_NEW_COUNT=$(git rev-list origin/${{ github.event.pull_request.base.ref }}..HEAD --count)
 
           echo "PR commits: $PR_COMMIT_COUNT"
@@ -38,6 +38,9 @@ jobs:
         run: |
           total_ai=0
           total_manual=0
+
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
 
           while IFS= read -r line; do
             if [[ "$line" =~ AI-Lines-Of-Code:\ ([0-9]+) ]]; then
