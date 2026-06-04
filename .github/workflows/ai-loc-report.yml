@@ -25,7 +25,7 @@ jobs:
   report:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -44,76 +44,38 @@ jobs:
 
           if [ "$MODE" == "last_n_commits" ]; then
             echo "**Mode:** Last $LAST_N commits on main" >> $GITHUB_STEP_SUMMARY
-            LOG_CMD="git log origin/main -${LAST_N} --format=%x00%aN%x00%B%x00"
-          else
-            echo "**Mode:** Date range from $FROM_DATE to $TO_DATE" >> $GITHUB_STEP_SUMMARY
-            LOG_CMD="git log origin/main --after=${FROM_DATE} --before=${TO_DATE} --format=%x00%aN%x00%B%x00"
-          fi
-
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          current_author=""
-          current_body=""
-
-          process_commit() {
-            local author="$1"
-            local body="$2"
-            local ai=0
-            local manual=0
+            # debug
+            echo "=== RAW COMMIT LOG ==="
+            git log origin/main -${LAST_N} --format="%H|%aN|%B|---END---"
+            echo "=== END RAW LOG ==="
 
             while IFS= read -r line; do
               if [[ "$line" =~ AI-Lines-Of-Code:\ ([0-9]+) ]]; then
-                ai=$((ai + ${BASH_REMATCH[1]}))
+                total_ai=$((total_ai + ${BASH_REMATCH[1]}))
               fi
               if [[ "$line" =~ Manual-LOC:\ ([0-9]+) ]]; then
-                manual=$((manual + ${BASH_REMATCH[1]}))
+                total_manual=$((total_manual + ${BASH_REMATCH[1]}))
               fi
-            done <<< "$body"
+            done < <(git log origin/main -${LAST_N} --format="%B")
 
-            if [ "$ai" -gt 0 ] || [ "$manual" -gt 0 ]; then
-              echo "$author|$ai|$manual" >> /tmp/dev_metrics.txt
-            fi
-          }
+          else
+            echo "**Mode:** Date range from $FROM_DATE to $TO_DATE" >> $GITHUB_STEP_SUMMARY
 
-          while IFS= read -r line; do
-            if [[ "$line" =~ $'\x00'(.+)$'\x00'(.*)$'\x00' ]]; then
-              if [ -n "$current_author" ]; then
-                process_commit "$current_author" "$current_body"
+            while IFS= read -r line; do
+              if [[ "$line" =~ AI-Lines-Of-Code:\ ([0-9]+) ]]; then
+                total_ai=$((total_ai + ${BASH_REMATCH[1]}))
               fi
-              current_author="${BASH_REMATCH[1]}"
-              current_body="${BASH_REMATCH[2]}"
-            fi
-          done < <(eval "$LOG_CMD")
-
-          if [ -n "$current_author" ]; then
-            process_commit "$current_author" "$current_body"
+              if [[ "$line" =~ Manual-LOC:\ ([0-9]+) ]]; then
+                total_manual=$((total_manual + ${BASH_REMATCH[1]}))
+              fi
+            done < <(git log origin/main --after="${FROM_DATE}" --before="${TO_DATE}" --format="%B")
           fi
 
-          # calc totals
-          while IFS='|' read -r author ai manual; do
-            total_ai=$((total_ai + ai))
-            total_manual=$((total_manual + manual))
-          done < /tmp/dev_metrics.txt
+          echo "DEBUG: total_ai=$total_ai total_manual=$total_manual"
 
-          # Overall summary
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📊 Overall Summary" >> $GITHUB_STEP_SUMMARY
           echo "| Type | Lines |" >> $GITHUB_STEP_SUMMARY
           echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| 🤖 AI-Assisted LOC | $total_ai |" >> $GITHUB_STEP_SUMMARY
           echo "| ✍️ Manual LOC | $total_manual |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Per developer
-          echo "### 👨‍💻 Per Developer" >> $GITHUB_STEP_SUMMARY
-          echo "| Developer | AI LOC | Manual LOC |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----------|--------|------------|" >> $GITHUB_STEP_SUMMARY
-
-          sort /tmp/dev_metrics.txt | awk -F'|' '
-          {
-            dev[$1]["ai"] += $2
-            dev[$1]["manual"] += $3
-          }
-          END {
-            for (d in dev)
-              print "| " d " | " dev[d]["ai"] " | " dev[d]["manual"] " |"
-          }' >> $GITHUB_STEP_SUMMARY
