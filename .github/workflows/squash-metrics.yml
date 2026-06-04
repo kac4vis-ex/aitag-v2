@@ -20,31 +20,24 @@ jobs:
           git fetch origin "pull/${{ github.event.pull_request.number }}/head:pr_head"
           git fetch origin ${{ github.event.pull_request.base.ref }}
 
-      - name: Detect squash merge
-        id: detect_squash
+      - name: Sum and amend metrics
         run: |
+          git config user.email "github-actions@github.com"
+          git config user.name "GitHub Actions"
+
           BASE_SHA="${{ github.event.pull_request.base.sha }}"
 
           PR_COMMIT_COUNT=$(git rev-list ${BASE_SHA}..pr_head --count)
-          MAIN_NEW_COUNT=$(git rev-list origin/${{ github.event.pull_request.base.ref }}..HEAD --count)
+          echo "PR commit count: $PR_COMMIT_COUNT"
 
-          echo "PR commits: $PR_COMMIT_COUNT"
-          echo "Main new commits: $MAIN_NEW_COUNT"
-
-          if [ "$PR_COMMIT_COUNT" -gt 1 ] && [ "$MAIN_NEW_COUNT" -eq 1 ]; then
-            echo "is_squash=true" >> $GITHUB_OUTPUT
-          else
-            echo "is_squash=false" >> $GITHUB_OUTPUT
+          # only process if squash (PR had multiple commits)
+          if [ "$PR_COMMIT_COUNT" -le 1 ]; then
+            echo "Single commit PR — skipping squash metrics"
+            exit 0
           fi
 
-      - name: Sum metrics from all PR commits
-        if: steps.detect_squash.outputs.is_squash == 'true'
-        id: metrics
-        run: |
           total_ai=0
           total_manual=0
-
-          BASE_SHA="${{ github.event.pull_request.base.sha }}"
 
           while IFS= read -r line; do
             if [[ "$line" =~ AI-Lines-Of-Code:\ ([0-9]+) ]]; then
@@ -55,25 +48,15 @@ jobs:
             fi
           done < <(git log ${BASE_SHA}..pr_head --format="%B")
 
-          echo "total_ai=$total_ai" >> $GITHUB_OUTPUT
-          echo "total_manual=$total_manual" >> $GITHUB_OUTPUT
           echo "Total AI: $total_ai, Manual: $total_manual"
-
-      - name: Amend squash commit message with metrics
-        if: steps.detect_squash.outputs.is_squash == 'true'
-        run: |
-          git config user.email "github-actions@github.com"
-          git config user.name "GitHub Actions"
 
           git checkout ${{ github.event.pull_request.base.ref }}
           git pull origin ${{ github.event.pull_request.base.ref }}
 
-          # get only PR title (first line) — no individual commit messages!
+          # get only PR title
           CURRENT_MSG=$(git log -1 --format="%s")
-          TOTAL_AI="${{ steps.metrics.outputs.total_ai }}"
-          TOTAL_MANUAL="${{ steps.metrics.outputs.total_manual }}"
 
-          NEW_MSG=$(printf "%s\n\nAI-Lines-Of-Code: %s\nManual-LOC: %s" "$CURRENT_MSG" "$TOTAL_AI" "$TOTAL_MANUAL")
+          NEW_MSG=$(printf "%s\n\nAI-Lines-Of-Code: %s\nManual-LOC: %s" "$CURRENT_MSG" "$total_ai" "$total_manual")
 
           git commit --amend -m "${NEW_MSG}"
           git push --force-with-lease origin ${{ github.event.pull_request.base.ref }}
