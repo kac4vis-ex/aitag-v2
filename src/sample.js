@@ -1,41 +1,19 @@
-// Sample message: prints a friendly message to console
+const http = require('http');
+
 function showSampleMessage() {
-  console.log('Hello from sample.js — this is a sample message!')
+  return 'Hello from sample.js — this is a sample message!';
 }
 
-// Expose for requires
-module.exports = { showSampleMessage }
-console.log('AI test line 1');
-console.log('AI test line 2');
-console.log('AI test line 1');
-console.log('AI test line 2');
-console.log('AI test line 2');
-console.log('AI test line 1');
-console.log('AI test line 2');
-console.log('AI test line 1');
-console.log('AI test line 2');
-console.log('AI test line 2');
-console.log('AI test line 1');
-console.log('AI test line 2');
-console.log('AI test line 2');
-console.log('AI test line 1');
-console.log('AI test line 2');
-console.log('AI test line 2');
-console.log('AI test line 1');
-console.log('AI test line 2');
-console.log('AI test line 1');
-console.log('AI test line 2');
-console.log('AI test line 2');
-console.log('AI test line 1');
-console.log('AI test line 2');
-console.log('AI test line 2');
-console.log('AI test line 1');
-console.log('AI test line 2');
-console.log('AI test line 2');
-console.log('AI test line 1');
-console.log('AI test line 2');
-console.log('AI test line 2');
-console.log('AI test line 2');
-console.log('AI test line 2');
-console.log('AI test line 2');
-console.log('AI test line 2');
+if (require.main === module) {
+  const port = Number(process.env.PORT) || 8080;
+  const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end(`${showSampleMessage()}\n`);
+  });
+
+  server.listen(port, () => {
+    console.log(`Server listening on port ${port}`);
+  });
+}
+
+module.exports = { showSampleMessage };

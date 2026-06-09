@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aitag-v2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aitag-v2
+  template:
+    metadata:
+      labels:
+        app: aitag-v2
+    spec:
+      containers:
+        - name: aitag-v2
+          image: your-registry.azurecr.io/aitag-v2:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"

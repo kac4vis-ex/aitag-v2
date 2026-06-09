@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: aitag-v2
+spec:
+  type: LoadBalancer
+  selector:
+    app: aitag-v2
+  ports:
+    - port: 80
+      targetPort: 8080
